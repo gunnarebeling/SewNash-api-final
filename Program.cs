@@ -39,7 +39,7 @@ builder.Services.AddCors(options =>
         {
             options.AddPolicy("AllowS3App",
                 policy => policy
-                    .WithOrigins("http://sewnash-app.s3-website-us-east-1.amazonaws.com") 
+                    .AllowAnyOrigin() 
                     .AllowAnyHeader()
                     .AllowAnyMethod());
         });

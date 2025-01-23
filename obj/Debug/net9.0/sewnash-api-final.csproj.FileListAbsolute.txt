@@ -141,3 +141,4 @@
 /Users/gunnarebeling/workspace/sewnash-api-final/obj/Debug/net9.0/sewnash-api-final.pdb
 /Users/gunnarebeling/workspace/sewnash-api-final/obj/Debug/net9.0/sewnash-api-final.genruntimeconfig.cache
 /Users/gunnarebeling/workspace/sewnash-api-final/obj/Debug/net9.0/ref/sewnash-api-final.dll
+/Users/gunnarebeling/workspace/sewnash-api-final/obj/Debug/net9.0/sewnash-api-final.sourcelink.json
