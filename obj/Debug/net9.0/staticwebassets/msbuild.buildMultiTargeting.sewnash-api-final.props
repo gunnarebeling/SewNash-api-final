@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="../build/sewnash-api-final.props" />
+</Project>
