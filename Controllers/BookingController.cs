@@ -85,7 +85,7 @@ public class BookingController : ControllerBase
 
     [HttpPut("{id}")]
     [Authorize]
-    public IActionResult Update(string id, BookingUpdateDTO bookingUpdate)
+    public IActionResult Update(string id,[FromBody] BookingUpdateDTO bookingUpdate)
     {
         Booking booking = _dbContext.Bookings.SingleOrDefault(b => b.Id == int.Parse(id));
 
