@@ -13,10 +13,12 @@ namespace sewnash.Controllers
     public class StripeController : ControllerBase
     {
         private SewNashDbContext _dbContext;
+        private readonly ILogger<StripeController> _logger;
 
-        public StripeController(SewNashDbContext dbContext)
+        public StripeController(SewNashDbContext dbContext, ILogger<StripeController> logger)
         {
-           _dbContext = dbContext;
+            _dbContext = dbContext;
+            _logger = logger;
         }
 
     [HttpPost]
@@ -146,6 +148,37 @@ Console.WriteLine($"Line Items Count: {calculationCreateOptions.LineItems.Count}
                 totalAmount = amountTotal / 100.0,
                 paymentIntentId = paymentIntent.Id
             });
+        }
+
+        [HttpPost("confirm-payment")]
+        public async Task<IActionResult> ConfirmPayment([FromBody] PaymentConfirmation request)
+        {
+            
+
+            var service = new PaymentIntentService();
+            try
+            {
+                var paymentIntent = await service.ConfirmAsync(request.PaymentIntentId);
+
+                if (paymentIntent.Status == "succeeded")
+                {
+                    // Handle booking logic here
+                    
+
+                    // Save bookingForm to your database
+
+                    return Ok(new { message = "Booking complete!" });
+                }
+                else
+                {
+                    return BadRequest(new { message = "Payment not successful" });
+                }
+            }
+            catch (StripeException e)
+            {
+                _logger.LogError(e.Message, "Error confirming payment");
+                return StatusCode(500, new { message = e.Message });
+            }
         }
 
         

@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "/Users/gunnarebeling/workspace/sewnash-api-final/sewnash-api-final.csproj": {}
+    "/Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/sewnash-api-final.csproj": {}
   },
   "projects": {
-    "/Users/gunnarebeling/workspace/sewnash-api-final/sewnash-api-final.csproj": {
+    "/Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/sewnash-api-final.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/Users/gunnarebeling/workspace/sewnash-api-final/sewnash-api-final.csproj",
+        "projectUniqueName": "/Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/sewnash-api-final.csproj",
         "projectName": "sewnash-api-final",
-        "projectPath": "/Users/gunnarebeling/workspace/sewnash-api-final/sewnash-api-final.csproj",
+        "projectPath": "/Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/sewnash-api-final.csproj",
         "packagesPath": "/Users/gunnarebeling/.nuget/packages/",
-        "outputPath": "/Users/gunnarebeling/workspace/sewnash-api-final/obj/",
+        "outputPath": "/Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "/Users/gunnarebeling/.nuget/NuGet/NuGet.Config"
@@ -81,6 +81,18 @@
             "Npgsql.EntityFrameworkCore.PostgreSQL": {
               "target": "Package",
               "version": "[9.0.3, )"
+            },
+            "Serilog.AspNetCore": {
+              "target": "Package",
+              "version": "[9.0.0, )"
+            },
+            "Serilog.Sinks.Http": {
+              "target": "Package",
+              "version": "[9.1.0, )"
+            },
+            "Serilog.Sinks.Seq": {
+              "target": "Package",
+              "version": "[9.0.0, )"
             },
             "Stripe.net": {
               "target": "Package",

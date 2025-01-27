@@ -25,4 +25,12 @@ public class Item
         public Item[] Items { get; set; }
         
     }
+
+    public class PaymentConfirmation
+    {
+        public string PaymentIntentId { get; set; }
+        public int SessionId { get; set; }
+        public int Occupancy { get; set; }
+    }
+  
     

@@ -11,12 +11,20 @@ using Amazon.Extensions.NETCore.Setup;
 using Amazon.Runtime;
 using Amazon;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 
 
 var builder = WebApplication.CreateBuilder(args);
 
 DotEnv.Load();
 // Add services to the container.
+var seqKey = Environment.GetEnvironmentVariable("SEQ_KEY");
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .WriteTo.Seq("http://localhost:5341", apiKey: seqKey) // Replace with your Seq server URL
+    .CreateLogger();
+
+builder.Host.UseSerilog();
 
 builder.Services.AddControllers().AddJsonOptions(opts =>
 {
@@ -33,6 +41,7 @@ builder.Configuration["JohnDoePassword"] = JohnDoePasswordHash;
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug(); 
+builder.Logging.AddSerilog();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddCors(options =>

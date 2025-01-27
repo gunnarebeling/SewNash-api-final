@@ -88,3 +88,6 @@ public
 
 # MacOS files
 .DS_Store
+
+bin/
+obj/
