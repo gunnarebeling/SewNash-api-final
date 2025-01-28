@@ -51,6 +51,7 @@ public class BookingController : ControllerBase
 
         using (var redLock = await _redLockFactory.CreateLockAsync(resource, expiry))
         {
+            
             if (redLock.IsAcquired)
             {
                 _logger.LogWarning($"Lock acquired for session {sessionId}");
