@@ -94,6 +94,10 @@
               "target": "Package",
               "version": "[9.0.0, )"
             },
+            "StackExchange.Redis": {
+              "target": "Package",
+              "version": "[2.8.24, )"
+            },
             "Stripe.net": {
               "target": "Package",
               "version": "[47.2.0, )"

@@ -16,6 +16,9 @@ public class Item
     {
       [JsonProperty("items")]
       public Item[] Items { get; set; }
+      [JsonProperty("sessionId")]
+      public int SessionId { get; set; }
+      public int MaxPeople { get; set; }
     }
 
    

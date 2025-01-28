@@ -6,6 +6,7 @@ using Stripe.Model;
 using SewNash.Data;
 using SewNash.Models;
 using Stripe.Tax;
+using StackExchange.Redis;
 namespace sewnash.Controllers
 {
     [Route("api/[controller]")]
@@ -14,18 +15,33 @@ namespace sewnash.Controllers
     {
         private SewNashDbContext _dbContext;
         private readonly ILogger<StripeController> _logger;
+        private readonly IConnectionMultiplexer _redis;
 
-        public StripeController(SewNashDbContext dbContext, ILogger<StripeController> logger)
+        public StripeController(SewNashDbContext dbContext, ILogger<StripeController> logger, IConnectionMultiplexer redis)
         {
             _dbContext = dbContext;
             _logger = logger;
+            _redis = redis;
         }
 
     [HttpPost]
-    public ActionResult Create([FromBody] PaymentIntentCreateRequest request)
+    public async Task<ActionResult> Create([FromBody] PaymentIntentCreateRequest request)
     {
         
       // Create a Tax Calculation for the items being sold
+       var db = _redis.GetDatabase();
+        var existingCacheKey = await db.StringGetAsync($"SessionId:{request.SessionId}");
+        if (existingCacheKey.HasValue)
+        {
+           int totalOccupancy = await CalculateTotalOccupancy(db, request.SessionId.ToString());
+           if (totalOccupancy + request.Items.Sum(i => i.Quantity) > request.MaxPeople)
+           {
+               return BadRequest(new { message = "The session is fully booked" });
+           }else{
+               await db.StringSetAsync($"SessionId:{request.SessionId}", "true");
+           }
+
+        }
        
         // Create a Tax Calculation for the items being sold
         var taxCalculation = CalculateTax(request.Items, "usd");
@@ -48,6 +64,8 @@ namespace sewnash.Controllers
         },
       });
 
+        _logger.LogInformation($"PaymentIntent created: {paymentIntent}");
+        var cacheKey = $"paymentIntent:{paymentIntent.Id}";
       return new JsonResult(new 
       { 
         clientSecret = paymentIntent.ClientSecret,
@@ -56,6 +74,26 @@ namespace sewnash.Controllers
         paymentIntentId = paymentIntent.Id
        });
     }
+    private async Task<int> CalculateTotalOccupancy(IDatabase db, string sessionId)
+
+        {
+            var server = _redis.GetServer(_redis.GetEndPoints()[0]);
+            var keys = server.Keys(pattern: $"SessionId:{sessionId}");
+            var bookings = _dbContext.Bookings.Where(b => b.SessionId == int.Parse(sessionId));
+            var totalBookedOccupancy = bookings.Sum(b => b.Occupancy);
+
+
+            int totalOccupancy = 0;
+            foreach (var key in keys)
+            {
+                var occupancyValue = await db.HashGetAsync(key, "occupancy");
+                if (occupancyValue.HasValue && int.TryParse(occupancyValue, out int occupancy))
+                {
+                    totalOccupancy += occupancy;
+                }
+            }
+            return totalOccupancy + totalBookedOccupancy;
+        }
 
     // Securely calculate the order amount, including tax
     [NonAction]

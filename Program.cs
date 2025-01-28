@@ -12,12 +12,20 @@ using Amazon.Runtime;
 using Amazon;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using StackExchange.Redis;
 
 
 var builder = WebApplication.CreateBuilder(args);
 
 DotEnv.Load();
 // Add services to the container.
+
+// Configure Redis
+var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
+var redis = ConnectionMultiplexer.Connect(redisConnectionString);
+builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
+
+
 var seqKey = Environment.GetEnvironmentVariable("SEQ_KEY");
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()

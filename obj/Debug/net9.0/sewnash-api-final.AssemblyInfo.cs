@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("sewnash-api-final")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1fcf6a09dd07dabc6d269a4ddd917e7f943ce372")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+264c084550528ce65222909add9de85ab4cd8cd7")]
 [assembly: System.Reflection.AssemblyProductAttribute("sewnash-api-final")]
 [assembly: System.Reflection.AssemblyTitleAttribute("sewnash-api-final")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
