@@ -8,6 +8,10 @@ using AutoMapper.QueryableExtensions;
 using AutoMapper;
 using System.Net.Mail;
 using System.Net;
+using RedLockNet;
+using RedLockNet.SERedis.Configuration;
+using RedLockNet.SERedis;
+using StackExchange.Redis;
 
 namespace SewNash.Controllers;
 
@@ -17,30 +21,90 @@ public class BookingController : ControllerBase
 {
     private SewNashDbContext _dbContext;
     private IMapper _mapper;
+    private readonly ILogger<BookingController> _logger;
+    private readonly IConnectionMultiplexer _redis;
+    private static IDistributedLockFactory _redLockFactory;
+    private static IRedLock _currentLock;
+    
 
-    public BookingController(SewNashDbContext context, IMapper mapper)
+    public BookingController(SewNashDbContext context, IMapper mapper, ILogger<BookingController> logger, IConnectionMultiplexer redis)
     {
         _dbContext = context;
         _mapper = mapper;
+        var redisEndpoints = new[] { new RedLockEndPoint { EndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 6379) } };
+        _redLockFactory = RedLockFactory.Create(redisEndpoints);
+        _logger = logger;
+        _redis = redis;
     }
+
+    [HttpGet("set-lock/{sessionId}")]
+    public async Task<IActionResult> SetLock(string sessionId)
+    {
+        var resource = $"lock:session:{sessionId}";
+        var expiry = TimeSpan.FromSeconds(30);
+
+        using (var redLock = await _redLockFactory.CreateLockAsync(resource, expiry))
+        {
+            if (redLock.IsAcquired)
+            {
+                _logger.LogInformation($"Lock acquired for session {sessionId}");
+                _currentLock = redLock;
+                return Ok();                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+            }
+            else
+            {
+                _logger.LogError("Lock not acquired");
+                return StatusCode(409);
+            }
+        }
+    }
+
 
     [HttpPost]
     public async Task<IActionResult> PostBooking([FromBody] BookingForPostDTO booking)
     {
-        Booking PostBooking = _mapper.Map<Booking>(booking);
-        PostBooking.DateBooked = DateTime.Now;
-        _dbContext.Bookings.Add(PostBooking);
-        _dbContext.SaveChanges();
-        SessionDTO session = _dbContext.Sessions.ProjectTo<SessionDTO>(_mapper.ConfigurationProvider).SingleOrDefault(s => s.Id == booking.SessionId);
-        DateTime date = session.DateTime;
-        string sewClass = session.SewClass.Name;
-        string americanDateFormat = date.ToString("MM/dd/yyy");
-        string day = session.Day.DayOfWeek;
-        string Time = session.Time.StartTime;
-        string DateAndTime = $"{americanDateFormat} {day} {Time}";
-        string name = PostBooking.Name; 
-        await SendEmailAsync(PostBooking.Email, name, sewClass, DateAndTime);
-        return Created($"/booking/{PostBooking.Id}", PostBooking);
+        var resource = $"lock:session:{booking.SessionId}";
+        var db = _redis.GetDatabase();
+        var lockExists = await db.KeyExistsAsync(resource);
+        _logger.LogWarning($"Lock:{_currentLock}");
+        if (!lockExists)
+        {
+            _logger.LogError("Lock does not exist");
+            return StatusCode(409, "Lock does not exist");
+        }
+       using var transaction = await _dbContext.Database.BeginTransactionAsync();
+       try
+       {
+            Booking PostBooking = _mapper.Map<Booking>(booking);
+            PostBooking.DateBooked = DateTime.Now;
+            _dbContext.Bookings.Add(PostBooking);
+            _dbContext.SaveChanges();
+
+            // Commit the transaction
+
+            SessionDTO session = _dbContext.Sessions.ProjectTo<SessionDTO>(_mapper.ConfigurationProvider).SingleOrDefault(s => s.Id == booking.SessionId);
+            DateTime date = session.DateTime;
+            string sewClass = session.SewClass.Name;
+            string americanDateFormat = date.ToString("MM/dd/yyy");
+            string day = session.Day.DayOfWeek;
+            string Time = session.Time.StartTime;
+            string DateAndTime = $"{americanDateFormat} {day} {Time}";
+            string name = PostBooking.Name; 
+            await SendEmailAsync(PostBooking.Email, name, sewClass, DateAndTime);
+            await transaction.CommitAsync();
+
+            // Release the lock
+            _currentLock.Dispose();
+            _currentLock = null;
+            _logger.LogInformation($"Booking created: {PostBooking}");
+            return Created($"/booking/{PostBooking.Id}", PostBooking);
+       }
+       catch (System.Exception ex)
+       {
+            _logger.LogError(ex, "An error occurred while creating a booking");
+             await transaction.RollbackAsync();
+            return StatusCode(500, ex.Message);
+       }
     }
 
     private async Task SendEmailAsync(string email, string name,string sewClass, string bookingDateTime)

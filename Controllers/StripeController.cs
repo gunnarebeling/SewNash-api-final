@@ -6,9 +6,11 @@ using Stripe.Model;
 using SewNash.Data;
 using SewNash.Models;
 using Stripe.Tax;
+using System.Net;
 using StackExchange.Redis;
 using RedLockNet.SERedis;
 using RedLockNet.SERedis.Configuration;
+using RedLockNet;
 namespace sewnash.Controllers
 {
     [Route("api/[controller]")]
@@ -18,26 +20,28 @@ namespace sewnash.Controllers
         private SewNashDbContext _dbContext;
         private readonly ILogger<StripeController> _logger;
         private readonly IConnectionMultiplexer _redis;
-        private readonly RedLockFactory _redLockFactory;
+       private static IDistributedLockFactory _redLockFactory;
+        private static IRedLock _currentLock;
 
         public StripeController(SewNashDbContext dbContext, ILogger<StripeController> logger, IConnectionMultiplexer redis)
         {
             _dbContext = dbContext;
             _logger = logger;
             _redis = redis;
-            _redLockFactory = RedLockFactory.Create(new List<RedLockMultiplexer> { new RedLockMultiplexer(redis) });
+            var redisEndpoints = new[] { new RedLockEndPoint { EndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 6379) } };
+            _redLockFactory = RedLockFactory.Create(redisEndpoints);
         }
 
+        
      [HttpPost]
         public async Task<ActionResult> Create([FromBody] PaymentIntentCreateRequest request)
         {
             var resource = $"lock:session:{request.SessionId}";
             var expiry = TimeSpan.FromSeconds(30);
 
-            using (var redLock = await _redLockFactory.CreateLockAsync(resource, expiry))
-            {
-                if (redLock.IsAcquired)
-                {
+            
+             
+                
                     using var transaction = await _dbContext.Database.BeginTransactionAsync();
                     try
                     {
@@ -78,13 +82,8 @@ namespace sewnash.Controllers
                         await transaction.RollbackAsync();
                         return StatusCode(500, new { message = "An error occurred while creating the payment intent" });
                     }
-                }
-                else
-                {
-                    _logger.LogWarning("Could not acquire lock");
-                    return StatusCode(429, new { message = "Could not acquire lock, please try again later" });
-                }
-            }
+                
+                
         }
     private async Task<int> CalculateTotalOccupancy(IDatabase db, string sessionId)
 

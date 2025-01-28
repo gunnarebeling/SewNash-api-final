@@ -299,3 +299,5 @@
 /Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/bin/Debug/net9.0/Serilog.Sinks.Seq.dll
 /Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/bin/Debug/net9.0/Pipelines.Sockets.Unofficial.dll
 /Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/bin/Debug/net9.0/StackExchange.Redis.dll
+/Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/bin/Debug/net9.0/RedLockNet.Abstractions.dll
+/Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/bin/Debug/net9.0/RedLockNet.SERedis.dll
