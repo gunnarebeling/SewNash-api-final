@@ -41,14 +41,24 @@ public class BookingController : ControllerBase
     public async Task<IActionResult> SetLock(string sessionId)
     {
         var resource = $"lock:session:{sessionId}";
-        var expiry = TimeSpan.FromSeconds(30);
+        var expiry = TimeSpan.FromSeconds(10);
+        bool lockExists = await _redis.GetDatabase().KeyExistsAsync(resource);
+        if (lockExists)
+        {
+            _logger.LogError("Lock already exists");
+            return StatusCode(409);
+        }
 
         using (var redLock = await _redLockFactory.CreateLockAsync(resource, expiry))
         {
             if (redLock.IsAcquired)
             {
-                _logger.LogInformation($"Lock acquired for session {sessionId}");
+                _logger.LogWarning($"Lock acquired for session {sessionId}");
                 _currentLock = redLock;
+                var db = _redis.GetDatabase();
+                db.SetAdd(resource, "lock");
+
+                _logger.LogWarning($"Lock:{_currentLock}");
                 return Ok();                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
             }
             else
@@ -64,11 +74,13 @@ public class BookingController : ControllerBase
     public async Task<IActionResult> PostBooking([FromBody] BookingForPostDTO booking)
     {
         var resource = $"lock:session:{booking.SessionId}";
+        _logger.LogWarning($"Lock:{resource}");
         var db = _redis.GetDatabase();
         var lockExists = await db.KeyExistsAsync(resource);
         _logger.LogWarning($"Lock:{_currentLock}");
         if (!lockExists)
         {
+            
             _logger.LogError("Lock does not exist");
             return StatusCode(409, "Lock does not exist");
         }
@@ -96,6 +108,9 @@ public class BookingController : ControllerBase
             // Release the lock
             _currentLock.Dispose();
             _currentLock = null;
+            db.KeyDelete(resource);
+            _logger.LogInformation($"Lock released for session {booking.SessionId}");
+
             _logger.LogInformation($"Booking created: {PostBooking}");
             return Created($"/booking/{PostBooking.Id}", PostBooking);
        }
