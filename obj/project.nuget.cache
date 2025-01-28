@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "xCXSaJ/kzz8=",
+  "dgSpecHash": "7ai4wddy6es=",
   "success": true,
   "projectFilePath": "/Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/sewnash-api-final.csproj",
   "expectedPackageFiles": [
@@ -54,6 +54,7 @@
     "/Users/gunnarebeling/.nuget/packages/npgsql/9.0.2/npgsql.9.0.2.nupkg.sha512",
     "/Users/gunnarebeling/.nuget/packages/npgsql.entityframeworkcore.postgresql/9.0.3/npgsql.entityframeworkcore.postgresql.9.0.3.nupkg.sha512",
     "/Users/gunnarebeling/.nuget/packages/pipelines.sockets.unofficial/2.2.8/pipelines.sockets.unofficial.2.2.8.nupkg.sha512",
+    "/Users/gunnarebeling/.nuget/packages/redlock.net/2.3.2/redlock.net.2.3.2.nupkg.sha512",
     "/Users/gunnarebeling/.nuget/packages/serilog/4.2.0/serilog.4.2.0.nupkg.sha512",
     "/Users/gunnarebeling/.nuget/packages/serilog.aspnetcore/9.0.0/serilog.aspnetcore.9.0.0.nupkg.sha512",
     "/Users/gunnarebeling/.nuget/packages/serilog.extensions.hosting/9.0.0/serilog.extensions.hosting.9.0.0.nupkg.sha512",

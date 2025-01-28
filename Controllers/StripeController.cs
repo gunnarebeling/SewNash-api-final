@@ -7,6 +7,8 @@ using SewNash.Data;
 using SewNash.Models;
 using Stripe.Tax;
 using StackExchange.Redis;
+using RedLockNet.SERedis;
+using RedLockNet.SERedis.Configuration;
 namespace sewnash.Controllers
 {
     [Route("api/[controller]")]
@@ -16,64 +18,74 @@ namespace sewnash.Controllers
         private SewNashDbContext _dbContext;
         private readonly ILogger<StripeController> _logger;
         private readonly IConnectionMultiplexer _redis;
+        private readonly RedLockFactory _redLockFactory;
 
         public StripeController(SewNashDbContext dbContext, ILogger<StripeController> logger, IConnectionMultiplexer redis)
         {
             _dbContext = dbContext;
             _logger = logger;
             _redis = redis;
+            _redLockFactory = RedLockFactory.Create(new List<RedLockMultiplexer> { new RedLockMultiplexer(redis) });
         }
 
-    [HttpPost]
-    public async Task<ActionResult> Create([FromBody] PaymentIntentCreateRequest request)
-    {
-        
-      // Create a Tax Calculation for the items being sold
-       var db = _redis.GetDatabase();
-        var existingCacheKey = await db.StringGetAsync($"SessionId:{request.SessionId}");
-        if (existingCacheKey.HasValue)
+     [HttpPost]
+        public async Task<ActionResult> Create([FromBody] PaymentIntentCreateRequest request)
         {
-           int totalOccupancy = await CalculateTotalOccupancy(db, request.SessionId.ToString());
-           if (totalOccupancy + request.Items.Sum(i => i.Quantity) > request.MaxPeople)
-           {
-               return BadRequest(new { message = "The session is fully booked" });
-           }else{
-               await db.StringSetAsync($"SessionId:{request.SessionId}", "true");
-           }
+            var resource = $"lock:session:{request.SessionId}";
+            var expiry = TimeSpan.FromSeconds(30);
 
+            using (var redLock = await _redLockFactory.CreateLockAsync(resource, expiry))
+            {
+                if (redLock.IsAcquired)
+                {
+                    using var transaction = await _dbContext.Database.BeginTransactionAsync();
+                    try
+                    {
+                        // Create a Tax Calculation for the items being sold
+                        var taxCalculation = CalculateTax(request.Items, "usd");
+                        var amountTotal = taxCalculation.AmountTotal;
+
+                        var paymentIntentService = new PaymentIntentService();
+                        var paymentIntent = paymentIntentService.Create(new PaymentIntentCreateOptions
+                        {
+                            Amount = amountTotal,
+                            Currency = "usd",
+                            AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions
+                            {
+                                Enabled = true,
+                            },
+                            Metadata = new Dictionary<string, string>
+                            {
+                                { "tax_calculation", taxCalculation.Id },
+                            },
+                        });
+
+                        _logger.LogInformation($"PaymentIntent created: {paymentIntent}");
+
+                        // Commit the transaction
+                        await transaction.CommitAsync();
+
+                        return new JsonResult(new
+                        {
+                            clientSecret = paymentIntent.ClientSecret,
+                            totalAmount = amountTotal / 100.0,
+                            paymentIntentId = paymentIntent.Id
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error creating payment intent");
+                        await transaction.RollbackAsync();
+                        return StatusCode(500, new { message = "An error occurred while creating the payment intent" });
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Could not acquire lock");
+                    return StatusCode(429, new { message = "Could not acquire lock, please try again later" });
+                }
+            }
         }
-       
-        // Create a Tax Calculation for the items being sold
-        var taxCalculation = CalculateTax(request.Items, "usd");
-
-        var AmountTotal = taxCalculation.AmountTotal;
-
-      var paymentIntentService = new PaymentIntentService();
-      var paymentIntent = paymentIntentService.Create(new PaymentIntentCreateOptions
-      {
-        Amount = AmountTotal,
-        Currency = "usd",
-        // In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
-        AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions
-        {
-          Enabled = true,
-        },
-        Metadata = new Dictionary<string, string>
-        {
-          { "tax_calculation", taxCalculation.Id },
-        },
-      });
-
-        _logger.LogInformation($"PaymentIntent created: {paymentIntent}");
-        var cacheKey = $"paymentIntent:{paymentIntent.Id}";
-      return new JsonResult(new 
-      { 
-        clientSecret = paymentIntent.ClientSecret,
-    
-        TotalAmount = AmountTotal / 100.0,
-        paymentIntentId = paymentIntent.Id
-       });
-    }
     private async Task<int> CalculateTotalOccupancy(IDatabase db, string sessionId)
 
         {

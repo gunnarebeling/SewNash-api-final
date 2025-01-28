@@ -82,6 +82,10 @@
               "target": "Package",
               "version": "[9.0.3, )"
             },
+            "RedLock.net": {
+              "target": "Package",
+              "version": "[2.3.2, )"
+            },
             "Serilog.AspNetCore": {
               "target": "Package",
               "version": "[9.0.0, )"
