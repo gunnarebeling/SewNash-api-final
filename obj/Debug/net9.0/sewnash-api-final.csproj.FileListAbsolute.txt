@@ -144,11 +144,6 @@
 /Users/gunnarebeling/workspace/sewnash-api-final/obj/Debug/net9.0/sewnash-api-final.sourcelink.json
 /Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/bin/Debug/net9.0/appsettings.Development.json
 /Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/bin/Debug/net9.0/appsettings.json
-/Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/bin/Debug/net9.0/publish/appsettings.Development.json
-/Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/bin/Debug/net9.0/publish/appsettings.json
-/Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/bin/Debug/net9.0/publish/sewnash-api-final.deps.json
-/Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/bin/Debug/net9.0/publish/sewnash-api-final.runtimeconfig.json
-/Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/bin/Debug/net9.0/publish/sewnash-api-final.staticwebassets.endpoints.json
 /Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/bin/Debug/net9.0/sewnash-api-final.staticwebassets.endpoints.json
 /Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/bin/Debug/net9.0/sewnash-api-final
 /Users/gunnarebeling/workspace/SewNash-apps/sewnash-api-final/bin/Debug/net9.0/sewnash-api-final.deps.json

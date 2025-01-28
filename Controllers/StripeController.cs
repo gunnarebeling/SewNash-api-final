@@ -158,7 +158,30 @@ Console.WriteLine($"Line Items Count: {calculationCreateOptions.LineItems.Count}
             var service = new PaymentIntentService();
             try
             {
-                var paymentIntent = await service.ConfirmAsync(request.PaymentIntentId);
+                 var paymentIntent = await service.GetAsync(request.PaymentIntentId);
+
+                string paymentMethodId = paymentIntent.PaymentMethodId;
+
+                // Check if PaymentMethodId is in PaymentMethodConfigurationDetails
+                if (paymentMethodId == null && paymentIntent.PaymentMethodConfigurationDetails != null)
+                {
+                    paymentMethodId = paymentIntent.PaymentMethodConfigurationDetails.Id;
+                }
+
+                if (paymentMethodId == null)
+                {
+                    _logger.LogError("Payment method is missing.");
+                        return BadRequest(new { message = "Payment method is missing." });
+                }
+                var options = new PaymentIntentConfirmOptions
+                {
+                    ReturnUrl = "http://localhost:5173/",
+                    PaymentMethod = paymentIntent.PaymentMethodId // Use the PaymentMethodId from the PaymentIntent
+                };
+
+
+
+                 paymentIntent = await service.ConfirmAsync(request.PaymentIntentId, options);
 
                 if (paymentIntent.Status == "succeeded")
                 {
