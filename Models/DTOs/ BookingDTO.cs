@@ -46,3 +46,8 @@ public class BookingUpdateDTO
     [Required]
     public int Occupancy { get; set; }
 }
+public class BookingCheckDTO
+{
+    public int SessionId { get; set; }
+    public int Occupancy { get; set; }
+}

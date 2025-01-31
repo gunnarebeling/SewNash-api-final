@@ -37,10 +37,10 @@ public class BookingController : ControllerBase
         _redis = redis;
     }
 
-    [HttpGet("set-lock/{sessionId}")]
-    public async Task<IActionResult> SetLock(string sessionId)
+    [HttpPost("set-lock")]
+    public async Task<IActionResult> SetLock([FromBody]BookingCheckDTO booking)
     {
-        var resource = $"lock:session:{sessionId}";
+        var resource = $"lock:session:{booking.SessionId}";
         var expiry = TimeSpan.FromSeconds(10);
         bool lockExists = await _redis.GetDatabase().KeyExistsAsync(resource);
         if (lockExists)
@@ -54,7 +54,16 @@ public class BookingController : ControllerBase
             
             if (redLock.IsAcquired)
             {
-                _logger.LogWarning($"Lock acquired for session {sessionId}");
+                _logger.LogWarning($"Lock acquired for session {booking.SessionId}");
+                List<Booking> bookings = _dbContext.Bookings.Where(b => b.SessionId == booking.SessionId).ToList();
+                SessionDTO session = _dbContext.Sessions.ProjectTo<SessionDTO>(_mapper.ConfigurationProvider).SingleOrDefault(s => s.Id == booking.SessionId);
+                int occupancy = bookings.Sum(b => b.Occupancy) + booking.Occupancy;
+                if (occupancy > session.SewClass.MaxPeople)
+                {
+                    _logger.LogError("Session is full");
+                    return StatusCode(409, "Session is full");
+                }
+
                 _currentLock = redLock;
                 var db = _redis.GetDatabase();
                 db.SetAdd(resource, "lock");
