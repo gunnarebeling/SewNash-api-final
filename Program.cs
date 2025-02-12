@@ -13,6 +13,11 @@ using Amazon;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using StackExchange.Redis;
+using System.Text.Json;
+using AutoMapper.QueryableExtensions;
+using SewNash.Models;
+using AutoMapper;
+
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -141,6 +146,22 @@ builder.Services.AddNpgsql<SewNashDbContext>(Environment.GetEnvironmentVariable(
 StripeConfiguration.ApiKey = Environment.GetEnvironmentVariable("STRIPE_SECRET");
 var app = builder.Build();
 
+async Task StoreSessionsInRedis(IServiceProvider services, IMapper mapper)
+{
+    var dbContext = services.GetRequiredService<SewNashDbContext>();
+    var redis = services.GetRequiredService<IConnectionMultiplexer>();
+    var db = redis.GetDatabase();
+    await db.ExecuteAsync("FLUSHDB");
+    
+    List<RedisSession> sessions = dbContext.Sessions.ProjectTo<RedisSession>(mapper.ConfigurationProvider).ToList();
+
+    sessions.ForEach(async session =>
+    {
+        var key = $"session:{session.Id}";
+        await db.StringSetAsync(key, JsonSerializer.Serialize(session));
+    });
+}
+
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -149,12 +170,15 @@ using (var scope = app.Services.CreateScope())
         var context = services.GetRequiredService<SewNashDbContext>();
         context.Database.Migrate();
        
+       var mapper = services.GetRequiredService<IMapper>();
+        await StoreSessionsInRedis(services, mapper);
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
         logger.LogError(ex, "An error occurred while migrating or seeding the database.");
     }
+
 }
 if (app.Environment.IsDevelopment())
 {
@@ -188,3 +212,5 @@ app.MapControllers();
 
 
 app.Run();
+
+public partial class Program{}

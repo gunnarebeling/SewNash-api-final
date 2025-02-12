@@ -20,8 +20,11 @@ public class AutoMapperProfiles : Profile
         CreateMap<Session, SessionForClassBookingDTO>();
         CreateMap<Session, SessionDTO>();
         CreateMap<Booking, BookingForSessionDTO>();
+        CreateMap<Booking, BookingForPostDTO>();
         CreateMap<BookingForPostDTO, Booking>();
         CreateMap<Photo, PhotoDTO>();
+        CreateMap<Session, RedisSession>();
+        CreateMap<SewClass, SewClassForRedisDTO>();
         
 
     }

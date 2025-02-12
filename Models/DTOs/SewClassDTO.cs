@@ -49,3 +49,13 @@ public class PostClassDTO
     public decimal PricePerPerson { get; set; }
     public int Duration { get; set; }
 }
+public class SewClassForRedisDTO
+{
+    public int Id { get; set; }
+    
+    public string Name { get; set; }
+    
+    public int MaxPeople { get; set; }
+    
+    
+}

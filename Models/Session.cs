@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using SewNash.Models.DTOs;
 
 
 namespace SewNash.Models;
@@ -24,4 +25,17 @@ public class Session
 
     public bool Open { get; set; }
 
+}
+
+public class RedisSession
+{
+    public int Id { get; set; }
+    public int SewClassId { get; set; }
+    public SewClassForRedisDTO SewClass { get; set; }
+    public DateTime DateTime { get; set; }
+    public int TimeId { get; set; }
+    public int DayId { get; set; }
+    public List<BookingForPostDTO> Bookings { get; set; }
+    public bool Open { get; set; }
+    public bool Processing { get; set; } = false;
 }

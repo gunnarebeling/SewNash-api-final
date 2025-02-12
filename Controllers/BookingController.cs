@@ -12,6 +12,7 @@ using RedLockNet;
 using RedLockNet.SERedis.Configuration;
 using RedLockNet.SERedis;
 using StackExchange.Redis;
+using System.Text.Json;
 
 namespace SewNash.Controllers;
 
@@ -40,41 +41,51 @@ public class BookingController : ControllerBase
     [HttpPost("set-lock")]
     public async Task<IActionResult> SetLock([FromBody]BookingCheckDTO booking)
     {
-        var resource = $"lock:session:{booking.SessionId}";
-        var expiry = TimeSpan.FromSeconds(10);
-        bool lockExists = await _redis.GetDatabase().KeyExistsAsync(resource);
-        if (lockExists)
-        {
-            _logger.LogError("Lock already exists");
-            return StatusCode(409);
-        }
 
+        var resource = $"lock:session:{booking.SessionId}";
+        var expiry = TimeSpan.FromSeconds(60);
         using (var redLock = await _redLockFactory.CreateLockAsync(resource, expiry))
         {
             
             if (redLock.IsAcquired)
             {
+                
+                var sessionValue = _redis.GetDatabase().StringGet($"session:{booking.SessionId}");
+                if (sessionValue.IsNullOrEmpty)
+                {
+                    _logger.LogError("Session not found in redis");
+                    return StatusCode(404, "Session not found");
+                }
+
+                RedisSession session = JsonSerializer.Deserialize<RedisSession>(sessionValue);
+                if (session.Processing)
+                {
+                    _logger.LogError("processing session");
+                    return StatusCode(409, "oops to late someone else is booking this session");
+                }
                 _logger.LogWarning($"Lock acquired for session {booking.SessionId}");
-                List<Booking> bookings = _dbContext.Bookings.Where(b => b.SessionId == booking.SessionId).ToList();
-                SessionDTO session = _dbContext.Sessions.ProjectTo<SessionDTO>(_mapper.ConfigurationProvider).SingleOrDefault(s => s.Id == booking.SessionId);
-                int occupancy = bookings.Sum(b => b.Occupancy) + booking.Occupancy;
-                if (occupancy > session.SewClass.MaxPeople)
+                
+                session.Processing = true;
+                int TotalOccupancy = session.Bookings.Sum(b => b.Occupancy) + booking.Occupancy;
+
+
+                if (TotalOccupancy > session.SewClass.MaxPeople)
                 {
                     _logger.LogError("Session is full");
                     return StatusCode(409, "Session is full");
                 }
+                 var updatedSessionJson = JsonSerializer.Serialize(session);
+                 _redis.GetDatabase().StringSet($"session:{booking.SessionId}", updatedSessionJson);
 
                 _currentLock = redLock;
-                var db = _redis.GetDatabase();
-                db.SetAdd(resource, "lock");
-
+               
                 _logger.LogWarning($"Lock:{_currentLock}");
                 return Ok();                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
             }
             else
             {
                 _logger.LogError("Lock not acquired");
-                return StatusCode(409);
+                return StatusCode(409, "Lock not acquired");
             }
         }
     }
@@ -83,16 +94,20 @@ public class BookingController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> PostBooking([FromBody] BookingForPostDTO booking)
     {
-        var resource = $"lock:session:{booking.SessionId}";
-        _logger.LogWarning($"Lock:{resource}");
+        var resource = $"session:{booking.SessionId}";
         var db = _redis.GetDatabase();
-        var lockExists = await db.KeyExistsAsync(resource);
-        _logger.LogWarning($"Lock:{_currentLock}");
-        if (!lockExists)
+        var pendingSession = db.StringGet(resource);
+        if (pendingSession.IsNullOrEmpty)
         {
-            
-            _logger.LogError("Lock does not exist");
-            return StatusCode(409, "Lock does not exist");
+            _logger.LogError("Session not found in redis");
+            return StatusCode(404, "Session not found");
+        }
+        RedisSession redisSession = JsonSerializer.Deserialize<RedisSession>(pendingSession);
+    
+        if (!redisSession.Processing)
+        {
+            _logger.LogError("Session not processing");
+            return StatusCode(409, "Session not processing");
         }
        using var transaction = await _dbContext.Database.BeginTransactionAsync();
        try
@@ -101,6 +116,10 @@ public class BookingController : ControllerBase
             PostBooking.DateBooked = DateTime.Now;
             _dbContext.Bookings.Add(PostBooking);
             _dbContext.SaveChanges();
+            redisSession.Bookings.Add(booking);
+            redisSession.Processing = false;
+            db.StringSet(resource, JsonSerializer.Serialize(redisSession));
+            
 
             // Commit the transaction
 
@@ -118,7 +137,6 @@ public class BookingController : ControllerBase
             // Release the lock
             _currentLock.Dispose();
             _currentLock = null;
-            db.KeyDelete(resource);
             _logger.LogInformation($"Lock released for session {booking.SessionId}");
 
             _logger.LogInformation($"Booking created: {PostBooking}");
