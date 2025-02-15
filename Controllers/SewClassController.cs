@@ -8,6 +8,13 @@ using AutoMapper.QueryableExtensions;
 using AutoMapper;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Microsoft.AspNetCore.Connections;
+using StackExchange.Redis;
+using NRedisStack.RedisStackCommands;
+using NetTopologySuite.IO;
+using System.Threading.Tasks;
+using NRedisStack.Search;
+using NRedisStack.Search.Literals.Enums;
 
 namespace SewNash.Controllers;
 
@@ -17,15 +24,18 @@ public class SewClassController : PhotoParent
 {
     private SewNashDbContext _dbContext;
     private IMapper _mapper;
-   
+    private readonly IConnectionMultiplexer _redis;
+    private ILogger<SewClassController> _logger;
    
     private const string BucketName = "sewnashbucket";
 
-    public SewClassController(SewNashDbContext context, IMapper mapper, IAmazonS3 s3Client)
+    public SewClassController(SewNashDbContext context, IMapper mapper, IAmazonS3 s3Client, IConnectionMultiplexer redis, ILogger<SewClassController> logger)
             : base(s3Client) // Pass the dependencies to the PhotoParent constructor
         {
             _dbContext = context;
             _mapper = mapper;
+            _redis = redis;
+            _logger = logger;
         }
 
     [HttpGet]
@@ -57,19 +67,65 @@ public class SewClassController : PhotoParent
 
     [HttpDelete("{id}")]
     [Authorize]
-    public IActionResult Delete(string id)
+    public async Task<IActionResult> Delete(string id)
     {
+        var redis = _redis.GetDatabase();
+        var redisdb = redis.JSON();
+
         SewClass sewClass = _dbContext.SewClasses.SingleOrDefault(c => c.Id == int.Parse(id));
         if (sewClass == default)
         {
             return NotFound();
         }
+
         bool hasBookings = _dbContext.Bookings
         .Include(b => b.Session) // Eager load Session
         .Any(b => b.Session.SewClassId == sewClass.Id && b.Session.DateTime >= DateTime.Now);
         if (hasBookings)
         {
             return BadRequest("there are bookings for this class");
+        }
+       // Create an index on the JSON documents
+        var schema = new Schema()
+            .AddNumericField(new FieldName("$.SewClassId", "SewClassId"));
+
+        // Check if the index already exists
+        var server = _redis.GetServer(_redis.GetEndPoints().First());
+        var indexExists = server.Keys(pattern: "idx:sessions").Any();
+        if (!indexExists)
+        {
+            bool indexCreated = redis.FT().Create(
+                "idx:sessions",
+                new FTCreateParams()
+                    .On(IndexDataType.JSON)
+                    .Prefix("session:"),
+                schema
+            );
+            _logger.LogInformation($"Index created: {indexCreated}");
+        }
+
+        // Query the index to find sessions with the specified SewClassId
+        int offset = 0;
+        int limit = 1000; // Adjust the limit as needed
+        var query = new Query($"@SewClassId:[{id} {id}]").Limit(offset, limit);
+        var searchResult = redis.FT().Search("idx:sessions", query);
+
+        _logger.LogInformation($"Search result count: {searchResult.TotalResults}");
+
+        while (searchResult.Documents.Count > 0)
+        {
+            _logger.LogInformation($"Search result count: {searchResult.TotalResults}");
+
+            foreach (var doc in searchResult.Documents)
+            {
+                var key = doc.Id;
+                redis.KeyDelete(key);
+                _logger.LogWarning($"Deleted session: {key}");
+            }
+
+            offset += limit;
+            query = new Query($"@SewClassId:[{id} {id}]").Limit(offset, limit);
+            searchResult = redis.FT().Search("idx:sessions", query);
         }
         _dbContext.Remove(sewClass);
         _dbContext.SaveChanges();

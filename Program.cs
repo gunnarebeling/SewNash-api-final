@@ -17,6 +17,7 @@ using System.Text.Json;
 using AutoMapper.QueryableExtensions;
 using SewNash.Models;
 using AutoMapper;
+using NRedisStack.RedisStackCommands;
 
 
 
@@ -151,15 +152,20 @@ async Task StoreSessionsInRedis(IServiceProvider services, IMapper mapper)
     var dbContext = services.GetRequiredService<SewNashDbContext>();
     var redis = services.GetRequiredService<IConnectionMultiplexer>();
     var db = redis.GetDatabase();
+    var jsonCommands = db.JSON();
     await db.ExecuteAsync("FLUSHDB");
     
     List<RedisSession> sessions = dbContext.Sessions.ProjectTo<RedisSession>(mapper.ConfigurationProvider).ToList();
 
-    sessions.ForEach(async session =>
+    try
+    {sessions.ForEach(async session =>
     {
         var key = $"session:{session.Id}";
-        await db.StringSetAsync(key, JsonSerializer.Serialize(session));
-    });
+        await jsonCommands.SetAsync(key, "$", session); 
+    });}catch
+    {
+        Console.WriteLine("Error storing sessions in Redis");
+    }
 }
 
 using (var scope = app.Services.CreateScope())

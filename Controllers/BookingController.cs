@@ -13,6 +13,7 @@ using RedLockNet.SERedis.Configuration;
 using RedLockNet.SERedis;
 using StackExchange.Redis;
 using System.Text.Json;
+using NRedisStack.RedisStackCommands;
 
 namespace SewNash.Controllers;
 
@@ -50,14 +51,14 @@ public class BookingController : ControllerBase
             if (redLock.IsAcquired)
             {
                 
-                var sessionValue = _redis.GetDatabase().StringGet($"session:{booking.SessionId}");
-                if (sessionValue.IsNullOrEmpty)
+                var sessionValue = _redis.GetDatabase().JSON().Get($"session:{booking.SessionId}");
+                if (sessionValue == null)
                 {
                     _logger.LogError("Session not found in redis");
                     return StatusCode(404, "Session not found");
                 }
-
-                RedisSession session = JsonSerializer.Deserialize<RedisSession>(sessionValue);
+                RedisSession session = JsonSerializer.Deserialize<RedisSession>(sessionValue.ToString());
+                
                 if (session.Processing)
                 {
                     _logger.LogError("processing session");
@@ -75,7 +76,8 @@ public class BookingController : ControllerBase
                     return StatusCode(409, "Session is full");
                 }
                  var updatedSessionJson = JsonSerializer.Serialize(session);
-                 _redis.GetDatabase().StringSet($"session:{booking.SessionId}", updatedSessionJson);
+                 _redis.GetDatabase().JSON().Set($"session:{booking.SessionId}", "$", updatedSessionJson);
+                 _logger.LogWarning($"Session updated: {updatedSessionJson}");
 
                 _currentLock = redLock;
                
@@ -95,14 +97,14 @@ public class BookingController : ControllerBase
     public async Task<IActionResult> PostBooking([FromBody] BookingForPostDTO booking)
     {
         var resource = $"session:{booking.SessionId}";
-        var db = _redis.GetDatabase();
-        var pendingSession = db.StringGet(resource);
-        if (pendingSession.IsNullOrEmpty)
+        var db = _redis.GetDatabase().JSON();
+        var pendingSession = db.Get(resource);
+        if (pendingSession == null)
         {
             _logger.LogError("Session not found in redis");
             return StatusCode(404, "Session not found");
         }
-        RedisSession redisSession = JsonSerializer.Deserialize<RedisSession>(pendingSession);
+        RedisSession redisSession = JsonSerializer.Deserialize<RedisSession>(pendingSession.ToString());
     
         if (!redisSession.Processing)
         {
@@ -118,7 +120,8 @@ public class BookingController : ControllerBase
             _dbContext.SaveChanges();
             redisSession.Bookings.Add(booking);
             redisSession.Processing = false;
-            db.StringSet(resource, JsonSerializer.Serialize(redisSession));
+            var updatedSessionJson = JsonSerializer.Serialize(redisSession);
+            db.Set(resource, "$", updatedSessionJson);
             
 
             // Commit the transaction

@@ -9,6 +9,7 @@ using AutoMapper;
 using System.Net.WebSockets;
 using StackExchange.Redis;
 using System.Text.Json;
+using NRedisStack;
 
 namespace SewNash.Controllers;
 
@@ -69,7 +70,7 @@ public class AvailabilityController : ControllerBase
         TotalRedisSessions.ForEach(session =>
         {
             var key = $"session:{session.Id}";
-            batch.StringSetAsync(key, JsonSerializer.Serialize(session));
+            batch.ExecuteAsync("JSON.SET", key, "$", JsonSerializer.Serialize(session));
         });
         batch.Execute();
         return Ok();
